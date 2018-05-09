@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+
+<body>
+    <h1>Hello!</h1>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.1.1/simplepeer.min.js"></script>
+    <script>
+        var socket = io();
+        var peers = [];
+        var myPeer;
+
+        function createPeer(initiator) {
+            console.log('Simple peer created:', {
+                initiator
+            });
+            var peer = new SimplePeer({
+                initiator: initiator,
+                trickle: false
+            });
+
+            peer.on('connect', function () {
+                console.log('CONNECTED');
+
+                console.log('Current peers:', peers);
+            });
+
+            peer.on('data', function (data) {
+                console.log('data: ' + data)
+            });
+
+            myPeer = peer;
+            return peer;
+        }
+    </script>
+    <script>
+        socket.emit('requestPeer');
+
+        socket.on('peerOfferReqested', function (socketId) {
+            var peer = createPeer(true);
+            peers.push({
+                socketId,
+                peer
+            });
+
+            peer.on('signal', d => {
+                socket.emit('peerOffer', socketId, d);
+            });
+        });
+
+        socket.on('peerOffered', (d, socketId) => {
+            var peer = createPeer(false);
+            peers.push({
+                socketId,
+                peer
+            });
+
+            peer.on('signal', s => {
+                socket.emit('peerAnswer', socketId, s);
+            });
+
+            peer.signal(d);
+        });
+
+        socket.on('peerAnswered', (d, socketId) => {
+            console.log('---------------- peer answered');
+            console.log('SocketId:', socketId);
+            console.log('data:', d);
+            console.log('MY SOCKETID:', socket.id);
+            var peer = peers.find(p => p.socketId == socketId).peer;
+            console.log('ACTIVE PEER:', peer);
+            peer.signal(d);
+            console.log('---------------- END');
+        });
+    </script>
+</body>
+
+</html>
